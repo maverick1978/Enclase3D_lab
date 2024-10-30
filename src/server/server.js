@@ -122,6 +122,96 @@ app.put('/api/users/:id/password', (req, res) => {
   );
 });
 
+// Rutas para gestión de cursos
+app.post('/api/courses', async (req, res) => {
+  const { teacher_id, title, description, subject, grade_level } = req.body;
+  
+  db.run(
+    'INSERT INTO courses (teacher_id, title, description, subject, grade_level) VALUES (?, ?, ?, ?, ?)',
+    [teacher_id, title, description, subject, grade_level],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ id: this.lastID, message: 'Curso creado exitosamente' });
+    }
+  );
+});
+
+app.get('/api/teachers/:teacherId/courses', (req, res) => {
+  const teacherId = req.params.teacherId;
+  
+  db.all(
+    'SELECT * FROM courses WHERE teacher_id = ? ORDER BY created_at DESC',
+    [teacherId],
+    (err, rows) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json(rows);
+    }
+  );
+});
+
+// Rutas para gestión de módulos
+app.post('/api/modules', (req, res) => {
+  const { course_id, title, description, order_index } = req.body;
+  
+  db.run(
+    'INSERT INTO modules (course_id, title, description, order_index) VALUES (?, ?, ?, ?)',
+    [course_id, title, description, order_index],
+    function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ id: this.lastID, message: 'Módulo creado exitosamente' });
+    }
+  );
+});
+
+// Rutas para gestión de estudiantes y matrículas
+app.post('/api/enrollments', (req, res) => {
+  const { course_id, student_id } = req.body;
+  
+  db.run(
+    'INSERT INTO course_enrollments (course_id, student_id) VALUES (?, ?)',
+    [course_id, student_id],
+    function(err) {
+      if (err) {
+        if (err.message.includes('UNIQUE constraint failed')) {
+          res.status(400).json({ error: 'Estudiante ya matriculado en este curso' });
+        } else {
+          res.status(500).json({ error: err.message });
+        }
+        return;
+      }
+      res.json({ id: this.lastID, message: 'Estudiante matriculado exitosamente' });
+    }
+  );
+});
+
+app.get('/api/courses/:courseId/students', (req, res) => {
+  const courseId = req.params.courseId;
+  
+  db.all(
+    `SELECT s.* FROM students s
+     JOIN course_enrollments ce ON s.id = ce.student_id
+     WHERE ce.course_id = ? AND ce.status = 'active'
+     ORDER BY s.name`,
+    [courseId],
+    (err, rows) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json(rows);
+    }
+  );
+});
+
 const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
